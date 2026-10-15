@@ -7,9 +7,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
-from .number_theory import gcd, generate_prime, mod_inverse
+from Crypto.Util.number import getPrime
+
+from .number_theory import gcd, mod_inverse
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,6 @@ class RSAKeyPair:
         return self.n, self.e
 
 
-# 【课程核心代码】RSA 加解密和密钥生成需填写实际编写者，并能现场解释。
 def _validate_transform_inputs(value: int, exponent: int, n: int, name: str) -> None:
     """检查 RSA 变换共同需要满足的整数取值条件。"""
 
@@ -53,6 +53,7 @@ def rsa_encrypt(message: int, e: int, n: int) -> int:
     """
 
     _validate_transform_inputs(message, e, n, "消息")
+    # 三参数 pow 完成模幂运算，该算法由 Python 提供。
     return pow(message, e, n)
 
 
@@ -60,14 +61,12 @@ def rsa_decrypt(ciphertext: int, d: int, n: int) -> int:
     """按照 ciphertext**d mod n 解密一个 RSA 整数。"""
 
     _validate_transform_inputs(ciphertext, d, n, "密文")
+    # 三参数 pow 完成模幂运算，该算法由 Python 提供。
     return pow(ciphertext, d, n)
 
 
-def generate_normal_rsa(
-    bits: int,
-    rng: Any = None,
-    primality_rounds: int = 40,
-) -> RSAKeyPair:
+# 【自己实现】组织普通 RSA 参数并检查各项合法条件。
+def generate_normal_rsa(bits: int) -> RSAKeyPair:
     """生成模数位数恰好为 bits 的普通 RSA 密钥对。
 
     使用标准公钥指数 65537。两个素数具有相同位数，因此大小相近。如果
@@ -77,23 +76,21 @@ def generate_normal_rsa(
     参数：
         bits: 要求的 n 位数。至少为 17，才能使合法的模数和欧拉函数值
             有可能大于固定指数 65537。
-        rng: 可选的密码学安全随机数源。
-        primality_rounds: 每个素数候选执行 Miller--Rabin 检测的轮数。
+
+    素数由 PyCryptodome 的 getPrime 函数生成，本项目不实现素性检测。
     """
 
     if bits < 17:
         raise ValueError("使用 e=65537 的普通 RSA 至少需要 17-bit 模数")
-    if primality_rounds <= 0:
-        raise ValueError("素性检测轮数 primality_rounds 必须为正数")
-
     public_exponent = 65_537
     # 等位数素数满足项目中“大小接近”的要求。请求奇数位模数时，乘积可能
     # 多出一位，因此后面还必须检查 n 的准确位数。
     prime_bits = (bits + 1) // 2
 
     while True:
-        p = generate_prime(prime_bits, rng=rng, rounds=primality_rounds)
-        q = generate_prime(prime_bits, rng=rng, rounds=primality_rounds)
+        # getPrime 负责素数生成和内部素性检测。
+        p = getPrime(prime_bits)
+        q = getPrime(prime_bits)
 
         if p == q:
             continue

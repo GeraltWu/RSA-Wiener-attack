@@ -159,7 +159,7 @@ python -B scripts/run_experiments.py --quick
 为什么使用整数平方根？
 
 > 2048-bit 整数转成 float 会丢失精度。候选判别式必须确认是完全平方数，所以
-> 全程使用整数平方根。
+> 使用 Python 标准库的 math.isqrt 做精确整数平方根计算，不使用浮点 sqrt。
 
 为什么可以从 phi 得到 p、q？
 

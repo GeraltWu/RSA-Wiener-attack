@@ -25,7 +25,7 @@ class RSATests(unittest.TestCase):
             rsa_decrypt(-1, 2753, 3233)
 
     def test_normal_key_invariants_and_round_trip(self) -> None:
-        key = generate_normal_rsa(64, primality_rounds=16)
+        key = generate_normal_rsa(64)
         self.assertEqual(key.n.bit_length(), 64)
         self.assertNotEqual(key.p, key.q)
         self.assertEqual(key.p * key.q, key.n)
@@ -37,7 +37,7 @@ class RSATests(unittest.TestCase):
             self.assertEqual(rsa_decrypt(encrypted, key.d, key.n), message)
 
     def test_weak_key_is_valid_and_below_requested_scale(self) -> None:
-        key = generate_weak_rsa(64, 0.5, primality_rounds=16)
+        key = generate_weak_rsa(64, 0.5)
         self.assertEqual(key.modulus_bits, 64)
         self.assertEqual(key.p * key.q, key.n)
         self.assertEqual((key.e * key.d) % key.phi, 1)

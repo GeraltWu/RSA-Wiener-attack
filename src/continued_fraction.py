@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 
 
-# 【课程核心代码】连分数与渐近分数需填写实际编写者，并能手算小型样例。
+# 【自己实现】使用连续整除计算连分数系数。
 def continued_fraction(numerator: int, denominator: int) -> list[int]:
     """返回一个有理数的简单连分数系数。
 
@@ -29,6 +29,7 @@ def continued_fraction(numerator: int, denominator: int) -> list[int]:
     return coefficients
 
 
+# 【自己实现】按照递推公式依次计算渐近分数。
 def convergents(coefficients: Iterable[int]) -> Iterator[tuple[int, int]]:
     """依次生成每个连分数前缀对应的 (分子, 分母)。
 

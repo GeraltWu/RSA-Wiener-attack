@@ -8,7 +8,7 @@ e 和 n，并通过精确整数运算恢复和验证 d、p、q。
 
 ## 目录
 
-- `src/number_theory.py`：GCD、扩展欧几里得、整数平方根、模逆、Miller–Rabin 和素数生成。
+- `src/number_theory.py`：GCD、扩展欧几里得和模逆。
 - `src/rsa.py`：RSA 密钥生成及整数加解密。
 - `src/weak_key_generator.py`：生成私钥指数 d 很小但数学上合法的 RSA 密钥。
 - `src/continued_fraction.py`：连分数与渐近分数。
@@ -25,12 +25,14 @@ e 和 n，并通过精确整数运算恢复和验证 d、p、q。
 
 ## 环境与运行
 
-项目已兼容当前 `common` 环境的 Python 3.7.1，不需要 pytest。测试使用标准库
-unittest，绘图使用环境中已有的 matplotlib。
+项目使用 `common` 环境中的 Python 3.11。素数生成使用 PyCryptodome，测试可使用
+标准库 unittest 或 pytest，绘图使用 matplotlib。
 
 ```powershell
 conda activate common
+python -m pip install -r requirements.txt
 python -B -m unittest discover -s tests -v
+python -m pytest -q
 python -B scripts/demo.py
 python -B scripts/run_experiments.py --quick
 python -B scripts/run_experiments.py --trials 10
@@ -84,6 +86,7 @@ python -B scripts/demo.py --fixture fixtures/weak_rsa_2048.json
 
 ## 作者与 AI 使用
 
-代码中的“课程核心代码”标记表示该部分必须填写真实作者，并能在答辩中解释，
-不是自动声明为学生原创。当前版本使用了 Codex 辅助，最终声明应按照真实修改、
-测试和 Git 记录填写，详见 `docs/CODE_AUTHORSHIP_AND_AI_USE.md`。
+代码中的“此部分为自己实现”标记用于区分项目编写的逻辑和直接调用的库功能；
+“库功能”标记表示不能把库内部算法算作自己的实现。标记不等于独立原创证明。
+当前版本使用了 Codex 辅助，最终声明应按照真实修改、测试和 Git 记录填写，详见
+`docs/CODE_AUTHORSHIP_AND_AI_USE.md`。

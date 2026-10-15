@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fractions import Fraction
+from math import isqrt
 from time import perf_counter
-from typing import Any
 
-from .number_theory import gcd, generate_prime, integer_sqrt, mod_inverse
+from Crypto.Util.number import getPrime
+
+from .number_theory import gcd, mod_inverse
 from .rsa import RSAKeyPair
 
 
@@ -47,6 +49,7 @@ class WeakRSAKeyPair:
         return RSAKeyPair(self.n, self.e, self.d, self.p, self.q, self.phi)
 
 
+# 【自己实现】组织 Wiener 边界的整数近似计算；isqrt 是库功能。
 def approximate_wiener_threshold(n: int) -> int:
     """返回整数近似值 floor(sqrt(sqrt(n))) // 3。
 
@@ -55,9 +58,11 @@ def approximate_wiener_threshold(n: int) -> int:
 
     if n <= 0:
         raise ValueError("n 必须为正数")
-    return integer_sqrt(integer_sqrt(n)) // 3
+    # isqrt 负责整数平方根，本项目只组合边界公式。
+    return isqrt(isqrt(n)) // 3
 
 
+# 【自己实现】用等价的整数不等式判断是否低于 Wiener 边界。
 def is_below_wiener_bound(d: int, n: int) -> bool:
     """使用整数精确判断课程边界 d < n**(1/4) / 3。
 
@@ -85,6 +90,7 @@ def _ratio_as_fraction(value: int | float | str | Fraction) -> Fraction:
     return ratio
 
 
+# 【自己实现】寻找接近目标且与 phi 互素的奇数 d。
 def _nearest_odd_coprime(target: int, phi: int) -> int:
     """寻找接近 target、大于 1 且与 phi 互素的奇数 d。
 
@@ -116,12 +122,10 @@ def _nearest_odd_coprime(target: int, phi: int) -> int:
         offset += 2
 
 
-# 【课程核心代码】弱密钥构造需填写实际编写者，并能解释为何密钥仍然合法。
+# 【自己实现】弱 RSA 参数构造和合法性检查。
 def generate_weak_rsa(
     bits: int,
     d_target_ratio: int | float | str | Fraction = 0.5,
-    rng: Any = None,
-    primality_rounds: int = 40,
 ) -> WeakRSAKeyPair:
     """生成一组私钥指数被故意选小、但数学上仍合法的 RSA 密钥。
 
@@ -133,16 +137,15 @@ def generate_weak_rsa(
 
     if bits < 16:
         raise ValueError("弱 RSA 生成至少需要 16-bit 模数")
-    if primality_rounds <= 0:
-        raise ValueError("素性检测轮数 primality_rounds 必须为正数")
 
     ratio = _ratio_as_fraction(d_target_ratio)
     prime_bits = (bits + 1) // 2
     started = perf_counter()
 
     while True:
-        p = generate_prime(prime_bits, rng=rng, rounds=primality_rounds)
-        q = generate_prime(prime_bits, rng=rng, rounds=primality_rounds)
+        # getPrime 负责素数生成和内部素性检测。
+        p = getPrime(prime_bits)
+        q = getPrime(prime_bits)
         if p == q:
             continue
 

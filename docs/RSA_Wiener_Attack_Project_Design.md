@@ -12,14 +12,14 @@
 
 最终交付一套可以运行的 Python 程序：
 
-1. **自己实现 RSA 的核心数学流程**：素数生成/素性检测、扩展欧几里得、模逆、RSA 公私钥生成和测试消息的模幂加解密。
+1. **实现 RSA 的参数组织流程**：使用库生成素数，自己完成扩展欧几里得、模逆、RSA 公私钥参数计算和测试消息的加解密接口。
 2. **自己构造故意有漏洞的 RSA 参数**：用大小相近的素数 $p,q$ 构造 $n=pq$，选取非常小而且与 $\varphi(n)$ 互素的 $d$，再令 $e=d^{-1}\pmod{\varphi(n)}$。
 3. **自己实现 Wiener Attack**：计算 $\frac{e}{n}$ 的连分数及渐近分数 $(k,d)$，验证候选参数并恢复真正的私钥指数，不向攻击函数提供 $p,q,\varphi(n),d$。
 4. **通过完整 Demo 验证漏洞**：仅输出 $(n,e)$ 给攻击端；恢复 $d$；用恢复私钥解密预先加密的测试整数；对正常参数给出“未恢复”的对照结果。
 5. **做实验与分析**：比较不同 $n$ 位数（如 256/512/1024/2048）、不同 $d$ 与 Wiener 理论边界的比例、攻击成功率和耗时，并做必要的重复与图表。
 6. **做 PPT 和答辩**：6 分钟介绍+现场 Demo，2 分钟 Q&A；如实陈述自己写的关键代码和 AI 辅助范围。
 
-**不做**：不开发网页、GUI、数据库；不尝试破解正常配置的 2048-bit RSA；不承诺发明新攻击；不把现成 Wiener 攻击库直接作为项目核心实现。
+**不做**：不开发网页、GUI、数据库；不尝试破解正常配置的 2048-bit RSA；不承诺发明新攻击；不把现成 Wiener 攻击库直接作为项目核心实现；不自行实现素性检测和素数生成。
 
 ---
 
@@ -40,7 +40,7 @@ ciphertext = pow(message, e, n)
 plaintext  = pow(ciphertext, d, n)
 ```
 
-普通 RSA 的重要性质是 $ed\equiv1\pmod{\varphi(n)}$。对于本课程的数学演示，直接对整数做模幂即可；**这叫 textbook RSA，不是可以直接部署在产品里的安全加密方案**。实际 RSA 加密应使用经过标准化的安全填充方案（如 OAEP）。
+普通 RSA 的重要性质是 $ed\equiv1\pmod{\varphi(n)}$。对于本课程的数学演示，直接对整数做模幂即可，但这种实现不能直接部署在实际产品中。实际 RSA 加密应使用经过标准化的安全填充方案（如 OAEP）。
 
 ### 1.2 Wiener 的切入点
 
@@ -105,7 +105,7 @@ $$
 
 ---
 
-## 2. 代码架构与函数接口（学生需要亲自实现）
+## 2. 代码架构与函数接口
 
 建议目录：
 
@@ -114,7 +114,7 @@ rsa-wiener-project/
 ├── README.md
 ├── requirements.txt                 # matplotlib（如需绘图）、pytest（可选）
 ├── src/
-│   ├── number_theory.py            #  gcd / extended_gcd / inverse / primality
+│   ├── number_theory.py            #  gcd / extended_gcd / inverse
 │   ├── rsa.py                      #  RSA 数学模块、生成正常密钥
 │   ├── weak_key_generator.py       #  小 d 的有效 RSA 密钥
 │   ├── continued_fraction.py       #  CF 系数 / convergents
@@ -140,14 +140,11 @@ rsa-wiener-project/
 | 函数签名建议 | 输入 | 输出 | 自己实现的算法 |
 |---|---|---|---|
 | `gcd(a: int,b: int)->int` | 任意整数 | 非负 GCD | Euclidean Algorithm，循环取余 |
-| `extended_gcd(a,b)->tuple[g,x,y]` | 整数 | `a*x+b*y=g` | 扩展欧几里得 |
+| `extended_gcd(a,b)->tuple[g,x,y]` | 非负整数 | `a*x+b*y=g` | 递归扩展欧几里得与逐层回代 |
 | `mod_inverse(a,m)->int` | `gcd(a,m)=1` | 规范化模逆 `[0,m-1]` | 从 `extended_gcd` 提取系数 |
-| `is_probable_prime(n, rounds=...) -> bool` | 大整数 | bool | 建议亲自实现 Miller–Rabin；教学实现要说明概率性与轮数 |
-| `generate_prime(bits, rng) -> int` | 指定位数 | 候选大素数 | 安全随机候选+素性检测 |
+素数生成直接调用 PyCryptodome 的 `Crypto.Util.number.getPrime(bits)`。其内部素性检测和随机候选生成属于库功能，不声明为学生自行实现。项目代码仍需检查 `p != q` 和 `n.bit_length()`，并在条件不满足时重新生成。
 
-建议采用标准库 `secrets` 生成用于生成候选素数的随机比特；`random` 不适合作为真正密钥生成的 CSPRNG。此处虽然故意构造不安全 $d$，也不要将“弱 RNG”引入为第二个混杂漏洞。可用 `int.bit_length()` 检查位数，筛除偶数、小素数倍数以提高速度。
-
-**验收测试**：`gcd(54,24)=6`；`mod_inverse(17,3120)=2753`；互素失败时抛异常；预期返回素数的长度正确且通过独立验证；`extended_gcd` 恒满足 Bézout 等式。
+**验收测试**：`gcd(54,24)=6`；`mod_inverse(17,3120)=2753`；互素失败时抛异常；`extended_gcd` 恒满足 Bézout 等式；生成的密钥满足 `p*q=n` 和请求位数。
 
 ### 2.2 `rsa.py` 与 `weak_key_generator.py`
 
@@ -216,7 +213,7 @@ for (index, (k, d)) in enumerate(convergents(coefficients)):
     delta ← s*s - 4*n
     if delta < 0:
         continue
-    root ← integer_sqrt(delta)
+    root ← math.isqrt(delta)
     if root*root != delta or (s+root) odd or (s-root) odd:
         continue
     p ← (s+root)//2

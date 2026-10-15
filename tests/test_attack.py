@@ -20,7 +20,7 @@ class WienerAttackTests(unittest.TestCase):
         self.assertEqual(result.p * result.q, 90581)
 
     def test_generated_weak_key_is_recovered(self) -> None:
-        key = generate_weak_rsa(64, 0.5, primality_rounds=16)
+        key = generate_weak_rsa(64, 0.5)
         result = wiener_attack(key.e, key.n)
         self.assertIsNotNone(result)
         assert result is not None

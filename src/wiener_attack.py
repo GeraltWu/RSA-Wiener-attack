@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isqrt
 from time import perf_counter
 
 from .continued_fraction import continued_fraction, convergents
-from .number_theory import integer_sqrt
 
 
 @dataclass(frozen=True)
@@ -21,7 +21,7 @@ class AttackResult:
     elapsed_s: float
 
 
-# 【课程核心代码】攻击流程需填写实际编写者，并能解释每个候选验证条件。
+# 【自己实现】Wiener 攻击流程及每个候选的验证逻辑。
 def wiener_attack(e: int, n: int) -> AttackResult | None:
     """尝试仅从公开的 (e, n) 恢复存在 Wiener 弱点的 RSA 密钥。
 
@@ -69,7 +69,8 @@ def wiener_attack(e: int, n: int) -> AttackResult | None:
         if discriminant < 0:
             continue
 
-        root = integer_sqrt(discriminant)
+        # isqrt 计算整数平方根，候选判别与验证逻辑由本函数完成。
+        root = isqrt(discriminant)
         if root * root != discriminant:
             continue
 

@@ -1,0 +1,3 @@
+# Python 缓存目录和编译文件
+__pycache__/
+*.py[cod]

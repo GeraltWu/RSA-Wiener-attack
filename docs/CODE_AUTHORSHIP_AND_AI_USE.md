@@ -2,8 +2,8 @@
 
 ## 重要说明
 
-源码中的“课程核心代码”标记表示该部分是课程要求学生掌握和说明的核心，不代表
-它已经可以被声明为学生独立原创。
+源码中的“自己实现”标记只用于指定的 11 个函数，表示这些函数是项目需要负责
+实现和讲解的部分。该标记不代表代码已经可以被声明为学生独立原创。
 
 当前仓库版本由 Codex 协助生成和修改，包括核心函数初稿、中文注释、测试、演示
 脚本、实验脚本和文档。因此最终提交时不能写成“完全没有使用 AI”。两位成员应
@@ -13,22 +13,23 @@
 
 | 函数或组件 | 为什么属于核心 | 实际学生作者 | AI 辅助方式 | 能否独立解释与测试 |
 |---|---|---|---|---|
-| `gcd`、`integer_sqrt` | 精确整数基础算法 | 待如实填写 | Codex 提供当前初稿和注释 | Yes / No |
-| `extended_gcd`、`mod_inverse` | RSA 求逆核心 | 待如实填写 | Codex 提供当前初稿和测试 | Yes / No |
-| `is_probable_prime`、`generate_prime` | 素数生成 | 待如实填写 | Codex 提供当前初稿和边界检查 | Yes / No |
-| `rsa_encrypt`、`rsa_decrypt` | RSA 运算 | 待如实填写 | Codex 提供当前初稿和测试 | Yes / No |
+| `gcd` | 最大公约数算法 | 待如实填写 | Codex 提供当前初稿和注释 | Yes / No |
+| `extended_gcd` | 扩展欧几里得与回代 | 待如实填写 | Codex 提供当前初稿和测试 | Yes / No |
+| `mod_inverse` | 根据扩展欧几里得结果计算模逆 | 待如实填写 | Codex 提供当前初稿和测试 | Yes / No |
 | `generate_normal_rsa` | 普通密钥生成 | 待如实填写 | Codex 提供当前初稿和测试 | Yes / No |
 | `generate_weak_rsa` | 弱参数构造 | 待如实填写 | Codex 提供当前初稿和整数边界判断 | Yes / No |
-| `continued_fraction`、`convergents` | Wiener 数学基础 | 待如实填写 | Codex 提供当前初稿和样例测试 | Yes / No |
+| `_nearest_odd_coprime` | 寻找合法的小私钥指数 | 待如实填写 | Codex 提供当前初稿和注释 | Yes / No |
+| `approximate_wiener_threshold` | 计算 Wiener 边界近似值 | 待如实填写 | Codex 提供当前初稿和注释 | Yes / No |
+| `is_below_wiener_bound` | 判断是否低于 Wiener 边界 | 待如实填写 | Codex 提供当前初稿和测试 | Yes / No |
+| `continued_fraction` | 计算连分数系数 | 待如实填写 | Codex 提供当前初稿和样例测试 | Yes / No |
+| `convergents` | 计算渐近分数 | 待如实填写 | Codex 提供当前初稿和样例测试 | Yes / No |
 | `wiener_attack` | 项目核心攻击 | 待如实填写 | Codex 提供当前初稿、验证逻辑和测试 | Yes / No |
-| 自动化测试 | 验证正确性 | 待如实填写 | Codex 建立当前测试集 | Yes / No |
-| 实验与绘图 | E1/E2/E3 | 待如实填写 | Codex 建立当前脚本 | Yes / No |
-| Demo 与文档 | 展示与讲解 | 待如实填写 | Codex 建立当前脚本和文档 | Yes / No |
 
 ## 不应声明为自行实现的库功能
 
 - Python 三参数 pow 的模幂实现。
-- secrets.SystemRandom 的随机数实现。
+- math.isqrt 的精确整数平方根实现。
+- PyCryptodome 的 getPrime 素数生成与内部素性检测。
 - CSV、argparse、dataclass、计时等标准库功能。
 - matplotlib 的绘图功能。
 
