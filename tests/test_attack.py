@@ -43,12 +43,5 @@ class WienerAttackTests(unittest.TestCase):
         # d=2753 的 RSA 示例不是小 d 的 Wiener 弱密钥。
         self.assertIsNone(wiener_attack(e=17, n=3233))
 
-    def test_invalid_public_key_is_rejected(self) -> None:
-        with self.assertRaises(ValueError):
-            wiener_attack(e=1, n=3233)
-        with self.assertRaises(ValueError):
-            wiener_attack(e=4000, n=3233)
-
-
 if __name__ == "__main__":
     unittest.main()

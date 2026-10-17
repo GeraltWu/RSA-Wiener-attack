@@ -12,7 +12,7 @@
 
 最终交付一套可以运行的 Python 程序：
 
-1. **实现 RSA 的参数组织流程**：使用库生成素数，自己完成扩展欧几里得、模逆、RSA 公私钥参数计算和测试消息的加解密接口。
+1. **实现 RSA 的参数组织流程**：使用库生成素数、计算最大公约数和模逆，自己组织 RSA 公私钥参数并提供测试消息的加解密接口。
 2. **自己构造故意有漏洞的 RSA 参数**：用大小相近的素数 $p,q$ 构造 $n=pq$，选取非常小而且与 $\varphi(n)$ 互素的 $d$，再令 $e=d^{-1}\pmod{\varphi(n)}$。
 3. **自己实现 Wiener Attack**：计算 $\frac{e}{n}$ 的连分数及渐近分数 $(k,d)$，验证候选参数并恢复真正的私钥指数，不向攻击函数提供 $p,q,\varphi(n),d$。
 4. **通过完整 Demo 验证漏洞**：仅输出 $(n,e)$ 给攻击端；恢复 $d$；用恢复私钥解密预先加密的测试整数；对正常参数给出“未恢复”的对照结果。
@@ -114,7 +114,6 @@ rsa-wiener-project/
 ├── README.md
 ├── requirements.txt                 # matplotlib（如需绘图）、pytest（可选）
 ├── src/
-│   ├── number_theory.py            #  gcd / extended_gcd / inverse
 │   ├── rsa.py                      #  RSA 数学模块、生成正常密钥
 │   ├── weak_key_generator.py       #  小 d 的有效 RSA 密钥
 │   ├── continued_fraction.py       #  CF 系数 / convergents
@@ -135,16 +134,14 @@ rsa-wiener-project/
 
 以下是**实现规格、算法步骤和测试预期**，不是替你们生成所有最终代码。根据老师的要求，实际编写核心代码的学生应记录开发过程，并能现场逐行解释。
 
-### 2.1 数论函数 `number_theory.py`
+### 2.1 直接使用的数论库功能
 
-| 函数签名建议 | 输入 | 输出 | 自己实现的算法 |
-|---|---|---|---|
-| `gcd(a: int,b: int)->int` | 任意整数 | 非负 GCD | Euclidean Algorithm，循环取余 |
-| `extended_gcd(a,b)->tuple[g,x,y]` | 非负整数 | `a*x+b*y=g` | 递归扩展欧几里得与逐层回代 |
-| `mod_inverse(a,m)->int` | `gcd(a,m)=1` | 规范化模逆 `[0,m-1]` | 从 `extended_gcd` 提取系数 |
-素数生成直接调用 PyCryptodome 的 `Crypto.Util.number.getPrime(bits)`。其内部素性检测和随机候选生成属于库功能，不声明为学生自行实现。项目代码仍需检查 `p != q` 和 `n.bit_length()`，并在条件不满足时重新生成。
+- `math.gcd(a, b)`：计算最大公约数，用于检查两个数是否互素。
+- `pow(value, -1, modulus)`：计算模逆。
+- `Crypto.Util.number.getPrime(bits)`：生成指定位数的素数。
 
-**验收测试**：`gcd(54,24)=6`；`mod_inverse(17,3120)=2753`；互素失败时抛异常；`extended_gcd` 恒满足 Bézout 等式；生成的密钥满足 `p*q=n` 和请求位数。
+这些功能直接由 Python 或 PyCryptodome 提供，不声明为学生自行实现。项目代码负责
+组织 RSA 参数、检查 `p != q` 和 `n.bit_length()`，并在条件不满足时重新生成。
 
 ### 2.2 `rsa.py` 与 `weak_key_generator.py`
 
@@ -152,16 +149,16 @@ rsa-wiener-project/
 
 1. 生成不同的、大小接近的 $p$ 和 $q$；若 `n.bit_length()!=bits` 则重试。
 2. `phi=(p-1)*(q-1)`。
-3. 优先尝试 `e=65537`；若 `gcd(e,phi)!=1`，重采样 $p,q$。
-4. 求 `d=mod_inverse(e,phi)`。
+3. 优先尝试 `e=65537`；使用 `math.gcd` 检查互素，不满足时重采样 $p,q$。
+4. 使用 `d=pow(e,-1,phi)` 求模逆。
 5. 返回结构化数据（公开字段 `n,e`；私有字段 `p,q,d,phi`），演示时不要把秘密字段泄露给 attack 函数。
 
 **弱密钥生成** `generate_weak_rsa(bits, d_target_ratio)`：
 
 1. 生成不同、约等长的素数 $p,q$；计算 `n,phi`。
 2. 使用目标比例 `r` 设置 `target ≈ r * T`，其中 `T = n^(1/4)/3` 是课程使用的理论标尺。
-3. 寻找**奇数**候选 `d>1`，满足 `gcd(d,phi)==1`、大小接近 target；为什么 d 需奇数？$\varphi(n)$ 对奇素数必为偶数。
-4. 计算 `e = mod_inverse(d,phi)`；要求 `1<e<phi` 且 `e*d % phi == 1`。
+3. 寻找**奇数**候选 `d>1`，使用 `math.gcd` 检查它与 `phi` 互素且大小接近 target；为什么 d 需奇数？$\varphi(n)$ 对奇素数必为偶数。
+4. 使用 `e=pow(d,-1,phi)` 计算模逆；要求 `1<e<phi` 且 `e*d % phi == 1`。
 5. 记录 `n.bit_length()`、`d.bit_length()`、`d/T`、公私钥、生成耗时；弱密钥只在本地教学环境使用。
 
 **避免浮点溢出/失准**：2048-bit 的 $n$ 不能先转 `float` 再直接求 `n**0.25`。建议用整数方法判断阈值：比较 `81*d^4 < n`，等价于 `d < n^(1/4)/3`（$d$ 为正整数）；构造目标 $d$ 可以用 `math.isqrt(math.isqrt(n)) // 3` 作为近似标尺并报告近似误差。对精确条件采用整数四次幂比较。
@@ -185,9 +182,10 @@ rsa-wiener-project/
 
 函数 B：`convergents(coefficients) -> iterator[tuple[int,int]]`
 
-- 初值：`p_prev2=0,p_prev1=1,q_prev2=1,q_prev1=0`。
-- 遍历系数 `a`：`p=a*p_prev1+p_prev2`、`q=a*q_prev1+q_prev2`。
-- 产生 `(p,q)` 并更新状态。
+- 依次截取长度为 1、2、3……的连分数前缀。
+- 对每个前缀从最右边开始，反向计算 `coefficient + 1/current_value`。
+- 若当前值为 `numerator/denominator`，则更新为 `(coefficient*numerator+denominator)/numerator`。
+- 每完成一个前缀就产生对应的 `(numerator,denominator)`。
 - 示例 `[2,3,1,4] -> (2,1),(7,3),(9,4),(43,19)`。
 - 单元测试还应包括 `e<n`（首项为 0）、长度为 1 的连分数、输入分子/分母互素与不互素的情形。
 
@@ -408,7 +406,6 @@ RSA WIENER ATTACK: LIVE DEMONSTRATION
 
 | Key Function / Component | Actual Author(s) | AI Assistance (what and how) | Able to explain/test? |
 |---|---|---|---|
-| `extended_gcd`, `mod_inverse` | 如实填写 | 填写真实情况 | Yes/No |
 | `generate_weak_rsa` | 如实填写 | 填写真实情况 | Yes/No |
 | `continued_fraction`, `convergents` | 如实填写 | 填写真实情况 | Yes/No |
 | `wiener_attack`, `recover_factors` | 如实填写 | 填写真实情况 | Yes/No |

@@ -8,7 +8,6 @@ e 和 n，并通过精确整数运算恢复和验证 d、p、q。
 
 ## 目录
 
-- `src/number_theory.py`：GCD、扩展欧几里得和模逆。
 - `src/rsa.py`：RSA 密钥生成及整数加解密。
 - `src/weak_key_generator.py`：生成私钥指数 d 很小但数学上合法的 RSA 密钥。
 - `src/continued_fraction.py`：连分数与渐近分数。

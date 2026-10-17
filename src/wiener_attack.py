@@ -11,7 +11,7 @@ from .continued_fraction import continued_fraction, convergents
 
 @dataclass(frozen=True)
 class AttackResult:
-    """保存恢复出的 RSA 私钥指数、因数和攻击诊断信息。"""
+    """保存恢复出的 d, p, q, 和攻击诊断数据。"""
 
     d: int
     p: int
@@ -24,26 +24,12 @@ class AttackResult:
 # 【自己实现】Wiener 攻击流程及每个候选的验证逻辑。
 def wiener_attack(e: int, n: int) -> AttackResult | None:
     """尝试仅从公开的 (e, n) 恢复存在 Wiener 弱点的 RSA 密钥。
-
-    恒等式 e*d - k*phi(n) = 1 表明：当 d 足够小且 RSA 素数满足
-    Wiener 定理的假设时，k/d 会非常接近 e/n。算法逐一检查渐近
-    分数 k/d，只有当候选能够精确重建 n 的整数因数时才接受。
-
-    返回：
-        成功时返回 AttackResult，否则返回 None。None 仅
-        表示本次攻击没有找到密钥，并不能证明该 RSA 密钥是安全的。
-
-    异常：
-        ValueError: 输入不满足本实现要求的公钥范围时抛出，即必须满足
-            n > 1 且 1 < e < n。
+    当 d 足够小且 RSA 素数满足 Wiener 定理的假设时，k/d 会非常接近 e/n。
+    算法逐一检查渐近分数 k/d，只有当候选能够精确重建 p 和 q 时才接受。
     """
 
-    if n <= 1:
-        raise ValueError("n 必须大于 1")
-    if not 1 < e < n:
-        raise ValueError("e 必须满足 1 < e < n")
-
     started = perf_counter()
+    # 计算 e/n 的 continued fraction coefficients。
     coefficients = continued_fraction(e, n)
 
     for index, (k, candidate_d) in enumerate(convergents(coefficients)):
@@ -58,23 +44,31 @@ def wiener_attack(e: int, n: int) -> AttackResult | None:
         if ed_minus_one % k != 0:
             continue
 
+        # 得到可能的 phi(n) ，并检查它是否能精确重建 p 和 q。
         candidate_phi = ed_minus_one // k
         if candidate_phi <= 0:
             continue
 
-        # 因为 phi(n)=(p-1)(q-1)=n-(p+q)+1，正确的 phi 可以给出
-        # s=p+q。因此 p、q 是方程 x^2 - s*x + n = 0 的两个根。
-        factor_sum = n - candidate_phi + 1
+        # 因为 phi(n)=(p-1)(q-1)=n-(p+q)+1
+        # p+q = n-phi(n)+1，pq = n
+        # 可以构造一个方程让 p 和 q 成为它的两个根。x = p 或 x = q
+        # 这个方程就是 (x-p)(x-q) = 0
+        # 因此 p、q 是方程 x^2 - (p+q)*x + pq = 0 的两个根。
+        # 接下来检查判别式 delta = b^2 - 4ac >= 0，就能判断 p、q 是否存在。
+        factor_sum = n - candidate_phi + 1 # p+q
         discriminant = factor_sum * factor_sum - 4 * n
         if discriminant < 0:
             continue
 
-        # isqrt 计算整数平方根，候选判别与验证逻辑由本函数完成。
-        root = isqrt(discriminant)
+        # delta = (p+q)²-4pq = p²+2pq+q²-4pq = p²-2pq+q² = (p-q)²。
+        # 必须保证 p、q 是整数，先保证 p - q 是整数
+        # 可以检查 delta 能否开平方得到整数。
+        root = isqrt(discriminant) # root = abs(p - q)
         if root * root != discriminant:
             continue
 
-        # 二次方程公式中的两个分子都必须为偶数，p、q 才会是整数。
+        # (p+q)+(p-q) = 2p，(p+q)-(p-q) = 2q (如果p>q，反过来也一样)
+        # 2p 和 2q 都必须为偶数，p、q 才会是整数。
         if (factor_sum + root) % 2 != 0 or (factor_sum - root) % 2 != 0:
             continue
 

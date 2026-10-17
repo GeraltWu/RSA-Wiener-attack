@@ -1,8 +1,8 @@
 """测试 RSA 变换和密钥生成。"""
 
 import unittest
+from math import gcd
 
-from src.number_theory import gcd
 from src.rsa import generate_normal_rsa, rsa_decrypt, rsa_encrypt
 from src.weak_key_generator import (
     approximate_wiener_threshold,

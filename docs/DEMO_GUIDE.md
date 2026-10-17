@@ -107,7 +107,7 @@ python -B scripts/demo.py --generate
 只展示三处，不要滚动整页代码：
 
 1. `scripts/demo.py` 中的 `wiener_attack(weak_key.e, weak_key.n)`，证明攻击入口只有公钥。
-2. `src/continued_fraction.py` 中的 convergents 递推。
+2. `src/continued_fraction.py` 中从右向左计算渐近分数的过程。
 3. `src/wiener_attack.py` 中判别式、整数平方根和 p*q==n 检查。
 
 ## 5. 图表讲解
