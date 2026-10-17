@@ -10,19 +10,20 @@ python -B -m unittest discover -s tests -v
 python -B scripts/demo.py
 ```
 
-正式演示优先使用默认 fixture 模式。它读取事先真实生成并验证过的 2048-bit
-弱密钥，不依赖网络，也不会把现场时间浪费在随机素数生成上。
+Demo 每次运行都会现场随机生成一组 2048-bit 弱 RSA 和一组 2048-bit 普通
+RSA。生成过程不依赖网络，开始后的等待时间取决于本机随机素数生成速度。
 
 完整实验应在演示前运行：
 
 ```powershell
-python -B scripts/run_experiments.py --trials 10
+python -B scripts/run_experiments.py
 ```
+
+运行前在 `scripts/run_experiments.py` 顶部确认 `TRIALS_PER_GROUP=30`，并确认
+`RUN_E1`、`RUN_E2`、`RUN_E3` 均为 `True`。
 
 确认以下文件存在：
 
-- `fixtures/weak_rsa_2048.json`
-- `fixtures/normal_rsa_2048.json`
 - `results/raw/e1_d_ratio.csv`
 - `results/raw/e2_modulus_bits.csv`
 - `results/raw/weak_vs_normal.csv`
@@ -35,18 +36,34 @@ python -B scripts/run_experiments.py --trials 10
 python -B scripts/demo.py
 ```
 
-可选的现场生成模式：
+默认输出已经包含：
+
+- 弱 RSA 和普通 RSA 的 n、e、d、p、q、phi 位数及缩写值。
+- `p*q==n` 和 `e*d mod phi==1` 验证。
+- Wiener 边界、d/T 和严格边界判断。
+- 连分数系数总数，以及用省略号连接首尾系数的一行摘要。
+- 成功候选附近的系数、候选 k/d、候选 phi、p+q、判别式和平方根。
+- 恢复出的 d、p、q、phi 与参考值的比较。
+- 密钥生成、加密、攻击和解密耗时。
+- 普通 RSA 的参数、连分数摘要和攻击失败结果。
+
+如需在答疑时展开完整值：
 
 ```powershell
-python -B scripts/demo.py --generate
+python -B scripts/demo.py --full-values
+python -B scripts/demo.py --full-coefficients
+python -B scripts/demo.py --full-values --full-coefficients
 ```
 
-现场生成模式得到的是新的随机密钥，运行时间不固定。它适合作为备用说明，不建议
-在只有 80 秒的正式 Demo 中优先使用。
+完整系数列表和完整 2048-bit 十进制整数会产生大量输出，正式演示建议使用默认
+摘要模式。
 
-## 3. 80 秒演示流程
+运行命令后先等待两组密钥生成完成，再开始讲解输出。程序会单独显示密钥生成
+时间，不会把它混入 Wiener 攻击时间。
 
-### 0–10 秒：说明目标
+## 3. 约 100 秒演示流程
+
+### 0–15 秒：说明数据分层
 
 建议讲稿：
 
@@ -56,17 +73,19 @@ python -B scripts/demo.py --generate
 屏幕上指出：
 
 - n.bit_length() 等于 2048。
-- n、e 只缩写显示，但程序内部使用完整整数。
-- 输出明确写着 d、p、q、phi 不传给攻击函数。
+- n、e、d、p、q、phi 都显示位数和缩写值，但程序内部使用完整整数。
+- d、p、q、phi 属于生成端参考值，只用于最后验证，攻击函数实际只接收 e、n。
+- 弱密钥的 d/T 约为 0.75，并且严格边界判断为 True。
 
-### 10–22 秒：准备密文
+### 15–28 秒：准备密文和连分数
 
 建议讲稿：
 
 > 我们先把一条短消息转换成整数，然后计算 c=m^e mod n。现在攻击方拥有 n、e
-> 和密文 c。
+> 和密文 c。程序同时显示 e/n 的连分数系数数量和部分系数，完整列表默认省略，
+> 避免 1200 多项内容淹没关键结果。
 
-### 22–48 秒：运行攻击
+### 28–55 秒：展示攻击恢复链条
 
 建议讲稿：
 
@@ -75,19 +94,21 @@ python -B scripts/demo.py --generate
 
 屏幕上指出：
 
-- 实际检查的 convergents 数量。
-- 恢复出的 d 只显示首尾数字。
-- p*q == n 为 True。
+- 成功候选的编号。
+- 成功渐近分数对应的 k 和候选 d。
+- `phi=(e*d-1)/k`、`p+q=n-phi+1` 和判别式。
+- 恢复出的 d、p、q、phi 均与参考值一致。
+- `p*q==n` 为 True。
 - 攻击耗时由程序实时测量，不是硬编码。
 
-### 48–60 秒：解密验证
+### 55–67 秒：解密验证
 
 建议讲稿：
 
-> 使用恢复出的 d 解密后，明文与原消息一致。测试端再比较 recovered d 和 fixture
-> 中的参考 d，确认我们恢复的是同一个私钥指数。
+> 使用恢复出的 d 解密后，明文与原消息一致。测试端再与本次现场生成时保留的
+> 参考 d 比较，确认恢复的是同一个私钥指数。
 
-### 60–72 秒：普通 RSA 对照
+### 67–90 秒：普通 RSA 对照
 
 建议讲稿：
 
@@ -95,12 +116,8 @@ python -B scripts/demo.py --generate
 > None，说明 Wiener 方法没有找到有效候选。它不是完整安全证明，但说明攻击成功
 > 依赖小 d 弱点，而不是因为所有 RSA 都能这样破解。
 
-### 72–80 秒：实验文件
-
-建议讲稿：
-
-> 最后两张图来自批量真实实验：第一张比较 d/T 与成功率，第二张比较模数位数与
-> 攻击耗时。每次 trial 的原始结果都保存在 CSV 中。
+同时指出普通 RSA 的 d 接近模数位数，严格 Wiener 边界判断为 False；程序将
+参数构造和攻击尝试分开展示，并使用相同的攻击入口。
 
 ## 4. 演示时展示的关键代码
 
@@ -117,7 +134,7 @@ python -B scripts/demo.py --generate
 - 红色虚线表示经典课程边界 d/T=1 的位置。
 - 边界左侧在满足其他假设时有理论保证。
 - 边界右侧可能成功也可能失败，不能说“超过边界就安全”。
-- `--quick` 的两次样本只用于检查程序，不能作为最终统计结论。
+- 将 `TRIALS_PER_GROUP` 临时改为 2 只能用于检查程序，不能作为最终统计结论。
 
 耗时图：
 
@@ -134,20 +151,18 @@ python -B scripts/demo.py --generate
 
 ## 6. 失败时的备用操作
 
-如果现场生成过慢或随机运行不符合预期：
-
-1. 按 Ctrl+C 停止现场生成。
-2. 运行 `python -B scripts/demo.py` 切回默认 fixture。
-3. 展示已经保存的真实 CSV 和 PNG。
-4. 明确说明当前使用的是预生成并验证过的 fixture，不要说成刚刚随机生成。
+如果现场生成比平时慢，应提前说明当前正在生成两个 1024-bit 素数构成的
+2048-bit 模数。演示前至少完整练习三次，并保留已经生成的真实实验 CSV 和 PNG
+作为结果说明；不要把 CSV 中的批量实验数据说成当前 Demo 的密钥。
 
 如果图片尚未生成：
 
 ```powershell
-python -B scripts/run_experiments.py --quick
+python -B scripts/run_experiments.py
 ```
 
-快速结果只用于恢复演示流程；正式报告仍使用完整实验结果。
+运行前可以临时把 `TRIALS_PER_GROUP` 改为 2，并只启用需要重新生成的实验。快速
+结果只用于恢复演示流程；正式报告仍使用完整实验结果。
 
 ## 7. 常见提问的简短回答
 

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
+from decimal import Decimal
+from math import isqrt
 from pathlib import Path
+from time import perf_counter
 
 
 # 直接运行 python scripts/demo.py 时，需要把项目根目录加入模块搜索路径。
@@ -13,13 +15,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.continued_fraction import continued_fraction, convergents
 from src.rsa import RSAKeyPair, generate_normal_rsa, rsa_decrypt, rsa_encrypt
-from src.weak_key_generator import generate_weak_rsa
+from src.weak_key_generator import (
+    approximate_wiener_threshold,
+    generate_weak_rsa,
+    is_below_wiener_bound,
+)
 from src.wiener_attack import wiener_attack
-
-
-DEFAULT_WEAK_FIXTURE = PROJECT_ROOT / "fixtures" / "weak_rsa_2048.json"
-DEFAULT_NORMAL_FIXTURE = PROJECT_ROOT / "fixtures" / "normal_rsa_2048.json"
 
 
 def abbreviate(value: int, digits: int = 16) -> str:
@@ -31,124 +34,233 @@ def abbreviate(value: int, digits: int = 16) -> str:
     return f"{text[:digits]}...{text[-digits:]}"
 
 
-def load_key_fixture(path: Path) -> RSAKeyPair:
-    """读取并验证一份 RSA JSON fixture。"""
+def display_integer(value: int, full_values: bool) -> str:
+    """根据演示选项返回完整整数或缩写整数。"""
 
-    if not path.exists():
-        raise FileNotFoundError(f"找不到 fixture：{path}")
-
-    data = json.loads(path.read_text(encoding="utf-8"))
-    required = ("n", "e", "d", "p", "q", "phi")
-    missing = [name for name in required if name not in data]
-    if missing:
-        raise ValueError(f"fixture 缺少字段：{', '.join(missing)}")
-
-    key = RSAKeyPair(**{name: int(data[name]) for name in required})
-    if key.p * key.q != key.n:
-        raise ValueError("fixture 不满足 p*q == n")
-    if (key.p - 1) * (key.q - 1) != key.phi:
-        raise ValueError("fixture 中的 phi 不正确")
-    if (key.e * key.d) % key.phi != 1:
-        raise ValueError("fixture 不满足 e*d mod phi == 1")
-    return key
+    return str(value) if full_values else abbreviate(value)
 
 
-def show_experiment_files() -> None:
-    """列出已经生成的实验图，不自动打开图形窗口。"""
+def display_coefficients(values: list[int], full_values: bool) -> str:
+    """格式化连分数系数，避免单个巨大系数撑满终端。"""
 
-    plot_dir = PROJECT_ROOT / "results" / "plots"
-    expected = (
-        plot_dir / "wiener_success_vs_d_ratio.png",
-        plot_dir / "wiener_time_vs_modulus_bits.png",
-    )
-    existing = [path for path in expected if path.exists()]
-    if existing:
-        print("6) 已生成的实验图：")
-        for path in existing:
-            print(f"   {path.relative_to(PROJECT_ROOT)}")
+    if full_values:
+        return str(values)
+    displayed = [abbreviate(value, digits=8) for value in values]
+    return f"[{', '.join(displayed)}]"
+
+
+def print_key_parameters(
+    title: str,
+    key: RSAKeyPair,
+    full_values: bool,
+    show_validation: bool = True,
+) -> None:
+    """按统一格式打印 RSA 参数，方便比较弱密钥和普通密钥。"""
+
+    print(title)
+    print(f"   n   ({key.n.bit_length():4d} bit) = {display_integer(key.n, full_values)}")
+    print(f"   e   ({key.e.bit_length():4d} bit) = {display_integer(key.e, full_values)}")
+    print(f"   d   ({key.d.bit_length():4d} bit) = {display_integer(key.d, full_values)}")
+    print(f"   p   ({key.p.bit_length():4d} bit) = {display_integer(key.p, full_values)}")
+    print(f"   q   ({key.q.bit_length():4d} bit) = {display_integer(key.q, full_values)}")
+    print(f"   phi ({key.phi.bit_length():4d} bit) = {display_integer(key.phi, full_values)}")
+    if show_validation:
+        print(f"   p*q == n               = {key.p * key.q == key.n}")
+        print(f"   e*d mod phi == 1       = {(key.e * key.d) % key.phi == 1}")
+
+
+def calculate_continued_fraction(
+    label: str,
+    e: int,
+    n: int,
+    full_coefficients: bool,
+) -> list[int]:
+    """计算连分数并打印适合现场展示的系数摘要。"""
+
+    coefficients = continued_fraction(e, n)
+
+    print(f"   {label} coefficient count = {len(coefficients)}")
+    if full_coefficients or len(coefficients) <= 20:
+        print(
+            f"   {label} coefficients = "
+            f"{display_coefficients(coefficients, full_coefficients)}"
+        )
     else:
-        print("6) 尚未生成实验图；可运行 python scripts/run_experiments.py --quick")
+        first_values = [abbreviate(value, digits=8) for value in coefficients[:12]]
+        last_values = [abbreviate(value, digits=8) for value in coefficients[-5:]]
+        summary = ", ".join(first_values + ["..."] + last_values)
+        print(f"   {label} coefficients = [{summary}]")
+    return coefficients
 
 
-def run_demo(weak_key: RSAKeyPair, normal_key: RSAKeyPair, source: str) -> bool:
-    """执行弱密钥攻击、解密验证和普通 RSA 对照。"""
+def run_demo(
+    weak_key: RSAKeyPair,
+    normal_key: RSAKeyPair,
+    source: str,
+    preparation_ms: float,
+    full_values: bool,
+    full_coefficients: bool,
+) -> bool:
+    """执行弱密钥攻击、逐步恢复展示和普通 RSA 对照。"""
 
-    print("=" * 62)
+    print("=" * 76)
     print("RSA WIENER ATTACK: LIVE DEMONSTRATION")
-    print("=" * 62)
+    print("=" * 76)
     print(f"数据来源：{source}")
+    print(f"密钥读取/准备时间：{preparation_ms:.3f} ms")
+    print("大整数默认显示首尾数字和位数，程序内部始终使用完整整数。")
     print()
 
-    print("1) 准备故意使用小私钥指数的 RSA")
-    print(f"   n.bit_length() = {weak_key.n.bit_length()}")
-    print(f"   public n = {abbreviate(weak_key.n)}")
-    print(f"   public e = {abbreviate(weak_key.e)}")
-    print("   d、p、q、phi 不传给攻击函数")
+    print("1) 弱 RSA 参数：生成端参考值")
+    print_key_parameters("   故意使用小 d 的 RSA：", weak_key, full_values)
+    weak_threshold = approximate_wiener_threshold(weak_key.n)
+    print(f"   Wiener threshold T = {display_integer(weak_threshold, full_values)}")
+    print(f"   d/T                 = {weak_key.d / weak_threshold:.6f}")
+    print(
+        "   d < n^(1/4)/3       = "
+        f"{is_below_wiener_bound(weak_key.d, weak_key.n)}"
+    )
+    print("   注意：d、p、q、phi 只作为演示参考，不传给攻击函数。")
+    print("   攻击函数的实际输入只有公开的 e 和 n。")
     print()
 
+    print("2) 加密测试消息并计算 e/n 的连分数")
     message_text = "Wiener attack demo"
     message = int.from_bytes(message_text.encode("utf-8"), "big")
+    encrypt_started = perf_counter()
     ciphertext = rsa_encrypt(message, weak_key.e, weak_key.n)
-    print("2) 生成测试密文")
-    print(f"   plaintext = {message_text!r}")
-    print(f"   ciphertext = {abbreviate(ciphertext)}")
-    print("   攻击者获得的公开数据只有 n、e 和密文")
+    weak_encrypt_ms = (perf_counter() - encrypt_started) * 1000
+    print(f"   plaintext text    = {message_text!r}")
+    print(f"   plaintext integer = {message}")
+    print(f"   ciphertext        = {display_integer(ciphertext, full_values)}")
+    print(f"   encryption time   = {weak_encrypt_ms:.3f} ms")
+    weak_coefficients = calculate_continued_fraction(
+        "weak RSA",
+        weak_key.e,
+        weak_key.n,
+        full_coefficients,
+    )
     print()
 
+    print("3) 只使用公开的 e、n 运行 Wiener 攻击")
+    attack_started = perf_counter()
     # 【关键演示点】攻击调用只传入公开的 e 和 n。
     result = wiener_attack(weak_key.e, weak_key.n)
+    weak_attack_ms = (perf_counter() - attack_started) * 1000
     if result is None:
-        print("3) 攻击未找到有效 Wiener 候选")
+        print("   攻击未找到有效 Wiener 候选")
         return False
 
-    factors_ok = result.p * result.q == weak_key.n
+    # 找到攻击成功时所对应的渐近分数 k/d，展示候选验证链条。
+    successful_k, successful_d = next(
+        candidate
+        for index, candidate in enumerate(convergents(weak_coefficients))
+        if index == result.candidate_index
+    )
+    recovered_phi = (weak_key.e * successful_d - 1) // successful_k
+    factor_sum = weak_key.n - recovered_phi + 1
+    discriminant = factor_sum * factor_sum - 4 * weak_key.n
+    discriminant_root = isqrt(discriminant)
+
+    nearby_start = max(0, result.candidate_index - 4)
+    nearby_coefficients = weak_coefficients[
+        nearby_start : result.candidate_index + 1
+    ]
+    print(
+        "   successful candidate       = "
+        f"No. {result.convergents_checked} (zero-based index {result.candidate_index})"
+    )
+    print(
+        f"   coefficients a[{nearby_start}:{result.candidate_index + 1}] "
+        f"= {display_coefficients(nearby_coefficients, full_coefficients)}"
+    )
+    print(f"   successful k               = {display_integer(successful_k, full_values)}")
+    print(f"   successful candidate d     = {display_integer(successful_d, full_values)}")
+    print(f"   e*d-1 divisible by k       = {(weak_key.e * successful_d - 1) % successful_k == 0}")
+    print(f"   recovered phi=(e*d-1)/k    = {display_integer(recovered_phi, full_values)}")
+    print(f"   recovered p+q=n-phi+1      = {display_integer(factor_sum, full_values)}")
+    print(f"   discriminant=(p+q)^2-4n    = {display_integer(discriminant, full_values)}")
+    print(f"   sqrt(discriminant)=|p-q|   = {display_integer(discriminant_root, full_values)}")
+    print(f"   recovered p                = {display_integer(result.p, full_values)}")
+    print(f"   recovered q                = {display_integer(result.q, full_values)}")
+    print(f"   recovered d                = {display_integer(result.d, full_values)}")
+    print(f"   recovered phi == reference = {recovered_phi == weak_key.phi}")
+    print(f"   recovered p*q == n         = {result.p * result.q == weak_key.n}")
+    print(f"   recovered d == reference   = {result.d == weak_key.d}")
+    print(f"   attack time                 = {weak_attack_ms:.3f} ms")
+    print()
+
+    print("4) 使用恢复出的 d 解密")
+    decrypt_started = perf_counter()
     recovered_message = rsa_decrypt(ciphertext, result.d, weak_key.n)
+    weak_decrypt_ms = (perf_counter() - decrypt_started) * 1000
     recovered_text = recovered_message.to_bytes(
         (recovered_message.bit_length() + 7) // 8,
         "big",
     ).decode("utf-8")
-    key_ok = result.d == weak_key.d
     decrypt_ok = recovered_message == message
-
-    print("3) 运行 wiener_attack(e, n)")
-    print(f"   checked convergents = {result.convergents_checked}")
-    print(f"   recovered d = {abbreviate(result.d)}")
-    print(f"   p*q == n = {factors_ok}")
-    print(f"   attack time = {result.elapsed_s * 1000:.3f} ms")
-    print()
-
-    print("4) 使用恢复出的 d 解密")
+    print(f"   recovered integer   = {recovered_message}")
     print(f"   recovered plaintext = {recovered_text!r}")
-    print(f"   recovered d == reference d = {key_ok}")
     print(f"   decryption successful = {decrypt_ok}")
+    print(f"   decryption time       = {weak_decrypt_ms:.3f} ms")
     print()
 
-    print("5) 普通 RSA 对照：使用完全相同的攻击入口")
+    print("5) 普通 RSA 对照")
+    print("   5.1 普通 RSA 参数构造")
+    print_key_parameters(
+        "   生成的普通 RSA 参数：",
+        normal_key,
+        full_values,
+        show_validation=False,
+    )
+    normal_threshold = approximate_wiener_threshold(normal_key.n)
+    normal_ratio = Decimal(normal_key.d) / Decimal(normal_threshold)
+    print(f"   d/T                     = {normal_ratio:.3E}")
+    print(
+        "   d < n^(1/4)/3           = "
+        f"{is_below_wiener_bound(normal_key.d, normal_key.n)}"
+    )
+
+    print()
+    print("   5.2 使用相同的 wiener_attack(e, n) 尝试攻击")
+    calculate_continued_fraction(
+        "normal RSA",
+        normal_key.e,
+        normal_key.n,
+        full_coefficients,
+    )
+    print("   （普通 RSA 使用 17-bit 的 e=65537，因此 e/n 的连分数通常很短。）")
+    normal_attack_started = perf_counter()
     normal_result = wiener_attack(normal_key.e, normal_key.n)
-    print(f"   normal n.bit_length() = {normal_key.n.bit_length()}")
-    print(f"   wiener_attack(e, n) returned None = {normal_result is None}")
-    print("   该结果只说明本次 Wiener 攻击未恢复密钥，不是完整安全证明")
+    normal_attack_ms = (perf_counter() - normal_attack_started) * 1000
+    print(f"   wiener_attack returned None = {normal_result is None}")
+    print(f"   attack time               = {normal_attack_ms:.3f} ms")
+    print("   None 只表示 Wiener 攻击未恢复该密钥，不是完整安全证明。")
     print()
 
-    show_experiment_files()
-    print("=" * 62)
-    return factors_ok and key_ok and decrypt_ok and normal_result is None
+    print("=" * 76)
+    return (
+        result.p * result.q == weak_key.n
+        and result.d == weak_key.d
+        and recovered_phi == weak_key.phi
+        and decrypt_ok
+        and normal_result is None
+    )
 
 
 def parse_args() -> argparse.Namespace:
-    """解析 fixture 模式和现场生成模式参数。"""
+    """解析控制大整数和连分数显示长度的参数。"""
 
     parser = argparse.ArgumentParser(description="演示 RSA Wiener 攻击")
-    source = parser.add_mutually_exclusive_group()
-    source.add_argument(
-        "--fixture",
-        type=Path,
-        help="读取指定弱 RSA fixture；不指定参数时使用项目默认 fixture",
-    )
-    source.add_argument(
-        "--generate",
+    parser.add_argument(
+        "--full-values",
         action="store_true",
-        help="现场随机生成 2048-bit 弱密钥和普通密钥",
+        help="打印 n、e、d、p、q、phi 等大整数的完整十进制值",
+    )
+    parser.add_argument(
+        "--full-coefficients",
+        action="store_true",
+        help="打印 e/n 的完整连分数系数列表",
     )
     return parser.parse_args()
 
@@ -157,18 +269,21 @@ def main() -> int:
     """命令行入口；成功返回 0，演示验证失败返回 1。"""
 
     args = parse_args()
-    if args.generate:
-        print("正在现场生成两组 2048-bit RSA 密钥，请稍候……")
-        weak_key = generate_weak_rsa(2048, 0.25).key_pair
-        normal_key = generate_normal_rsa(2048)
-        source = "现场随机生成"
-    else:
-        weak_path = args.fixture or DEFAULT_WEAK_FIXTURE
-        weak_key = load_key_fixture(weak_path)
-        normal_key = load_key_fixture(DEFAULT_NORMAL_FIXTURE)
-        source = f"已验证 fixture：{weak_path.name}"
+    preparation_started = perf_counter()
+    weak_key = generate_weak_rsa(2048, 0.75).key_pair
+    normal_key = generate_normal_rsa(2048)
+    source = "本次运行现场随机生成的两组 2048-bit RSA 密钥"
 
-    return 0 if run_demo(weak_key, normal_key, source) else 1
+    preparation_ms = (perf_counter() - preparation_started) * 1000
+    success = run_demo(
+        weak_key,
+        normal_key,
+        source,
+        preparation_ms,
+        args.full_values,
+        args.full_coefficients,
+    )
+    return 0 if success else 1
 
 
 if __name__ == "__main__":

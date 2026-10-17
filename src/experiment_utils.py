@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import asdict, dataclass
+from decimal import Decimal
 from pathlib import Path
 from statistics import median
 from typing import Iterable
@@ -19,7 +20,7 @@ class TrialRecord:
     n_bits: int
     actual_n_bits: int
     d_bits: int
-    d_to_threshold: float
+    d_to_threshold: Decimal
     below_wiener_bound: bool
     recovered: bool
     convergents_checked: int

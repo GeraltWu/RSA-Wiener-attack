@@ -1,8 +1,6 @@
 """测试攻击只使用公开参数，并且会验证精确因数。"""
 
-import json
 import unittest
-from pathlib import Path
 
 from src.wiener_attack import wiener_attack
 from src.weak_key_generator import generate_weak_rsa
@@ -27,17 +25,14 @@ class WienerAttackTests(unittest.TestCase):
         self.assertEqual(result.d, key.d)
         self.assertEqual(result.p * result.q, key.n)
 
-    def test_2048_bit_fixture_is_recovered(self) -> None:
-        fixture_path = Path(__file__).parents[1] / "fixtures" / "weak_rsa_2048.json"
-        data = json.loads(fixture_path.read_text(encoding="utf-8"))
-        n, e, expected_d = int(data["n"]), int(data["e"]), int(data["d"])
-
-        result = wiener_attack(e, n)
-        self.assertEqual(n.bit_length(), 2048)
+    def test_generated_2048_bit_key_is_recovered(self) -> None:
+        key = generate_weak_rsa(2048, 0.75)
+        result = wiener_attack(key.e, key.n)
+        self.assertEqual(key.n.bit_length(), 2048)
         self.assertIsNotNone(result)
         assert result is not None
-        self.assertEqual(result.d, expected_d)
-        self.assertEqual(result.p * result.q, n)
+        self.assertEqual(result.d, key.d)
+        self.assertEqual(result.p * result.q, key.n)
 
     def test_non_vulnerable_public_key_returns_none(self) -> None:
         # d=2753 的 RSA 示例不是小 d 的 Wiener 弱密钥。

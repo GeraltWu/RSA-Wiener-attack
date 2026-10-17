@@ -255,9 +255,9 @@ d_bits, d_to_threshold, below_wiener_bound, recovered,
 convergents_checked, keygen_ms, attack_ms, verify_ok, notes
 ```
 
-- `seed_or_trial_label` 只是标识；若用 `secrets`，不要假装能够完全确定性重现同一随机密钥，可将**用于教学复现的固定公钥测试向量**另存为本地 fixtures。
+- `seed_or_trial_label` 只是标识；密钥使用安全随机源生成，不假装能够确定性重现同一随机密钥。
 - 运行计时用 `time.perf_counter()`，**把密钥生成耗时和攻击耗时分开**。
-- 对每组做多次 trial，最少先 10 次确认程序稳定，再视时间提高到 30–50 次；取平均值、median、范围，必要时给标准差。
+- 快速调试时每组先做少量 trial；正式实验每组运行 30 次，记录 median、范围和成功率。
 - 关键检查：密钥生成程序是合法 RSA、只修改指定弱点；不要把生成失败计入攻击失败。
 - 详细实验图标注 $n$ 位数、机器环境、样本数、单位、弱 $d$ 的条件。
 
@@ -265,7 +265,7 @@ convergents_checked, keygen_ms, attack_ms, verify_ok, notes
 
 **问题**：$d$ 越接近/越超过经典 Wiener 边界，攻击表现如何变化？
 
-固定 `n_bits=512` 或 `1024`（先便于快速迭代），令 `T ≈ n^(1/4)/3`；取几组目标 `d/T`，如 `0.25, 0.50, 0.75, 1.25, 2.0`。每组生成多套**有效** RSA 密钥，并记录实际 `d/T`、成功率、候选数量。
+固定 `n_bits=512`，令 `T ≈ n^(1/4)/3`；目标 `d/T` 取 `0.25, 0.50, 0.75, 1.00, 1.25, 1.50, 2.00, 2.50, 3.00, 4.00, 5.00, 8.00`。每组生成 30 套**有效** RSA 密钥，并记录实际 `d/T`、成功率、候选数量。
 
 **注意**：小于边界的成功结论需要满足定理对 $p,q$ 比例的其他假设；大于边界未必失败。图表仅反映实验观测，不能把边界误说成“任何超出都安全”。
 
@@ -276,8 +276,8 @@ convergents_checked, keygen_ms, attack_ms, verify_ok, notes
 **问题**：针对特意选用弱 $d$ 的 RSA，$n$ 从 256 bit 增长到 2048 bit 时攻击是否仍然可行？
 
 - `n_bits ∈ {256,512,1024,2048}`（如时间足够，可加 4096）。
-- 维持 `d/T` 在很小的安全实验区间，例如约 `0.25`；选择大小相近的素数。
-- 每组可先重复 10 次；本地快速确认后提升至 20–30 次，记录每次攻击耗时、候选渐近分数数目、成功率。
+- 维持 `d/T≈0.75`，使弱密钥仍在经典边界内，但比原来的 0.25 更接近边界；选择大小相近的素数。
+- 正式实验每组重复 30 次，记录每次攻击耗时、候选渐近分数数目和成功率。
 - 关键截图/视频：**2048-bit weak RSA 成功恢复 $d$，并完成解密验证**。
 
 **输出**：折线图 `Attack Time (ms) vs RSA Modulus Size (bits)`；可加 `Convergents Checked vs Key Size`。测试结果要由本组实测填写，文档不预填任何假数字。
@@ -286,6 +286,7 @@ convergents_checked, keygen_ms, attack_ms, verify_ok, notes
 
 **问题**：攻击成功是否依赖“小私钥指数”，而非“RSA 是弱算法”？
 
+- 两组均使用 `n_bits=2048`，与现场 Demo 的密钥规模保持一致。
 - 对照组：按正常模式生成 RSA（如固定常见的 `e=65537`）。
 - 弱组：相近位数、故意构造很小的 $d$。
 - 对两组使用完全相同的攻击入口 `wiener_attack(e,n)`。
@@ -342,7 +343,7 @@ RSA WIENER ATTACK: LIVE DEMONSTRATION
    elapsed: XX ms
 
 5) Normal RSA control
-   generate normal RSA / load verified normal fixture
+   generate normal RSA
    run identical attack
    no valid Wiener key recovered (in this run)
 
@@ -354,11 +355,11 @@ RSA WIENER ATTACK: LIVE DEMONSTRATION
 
 ### 4.3 演示可靠性
 
-- **先预生成合法测试样本**（保存公钥和仅用于检验的秘密参考），保证 6 分钟展示不会因为现场生成素数而拖延；如果现场生成耗时短，也可以演示一键生成，但要有备份。
-- 至少准备一份通过测试的 2048-bit 弱密钥样例（fixture），在没有网络的机器上也能运行。
-- Demo 脚本用 `--fixture` 和 `--generate` 两种模式，先跑稳定模式；**不伪装 fixture 为现场随机生成**。
+- Demo 每次现场生成一组弱 RSA 和一组普通 RSA，并单独显示密钥生成耗时。
+- 弱密钥生成后立即运行攻击并验证恢复值；普通密钥使用相同攻击入口并如实报告结果。
+- 生成素数不依赖网络，但耗时具有随机性，因此应在演示机器上提前完整练习至少三次。
 - 使用简短的输出格式，2048-bit 整数只展示位长、前后若干位或保存到文件；讲解时强调内部使用完整整数。
-- 如果 live run 意外失败：直接切换到另一个**先前真实验证通过**的 fixture，再现场跑攻击；最后展示保留的真实实验 CSV 和图片。不要把事前录制结果冒充实时运行。
+- 保留真实实验 CSV 和图表作为批量实验记录，但不要把这些数据说成当前 Demo 生成的密钥。
 - 现场前：确认 Python 版本、依赖安装、路径、显示分辨率、终端字体、运行时间，练习至少 3 次。
 
 ### 4.4 Demo 检验标准
@@ -396,7 +397,7 @@ RSA WIENER ATTACK: LIVE DEMONSTRATION
 
 **Slide 4**（55 秒）：代码模块与可验证的亲自实现部分；`math.isqrt` 验证候选 $p,q$，不使用浮点；攻击只输入 $(n,e)$。
 
-**Slide 5**（80 秒）：运行准备好的 weak-2048 fixture；指出模数实际位数，恢复 $d$ 的一致性与解密结果；再显示 normal control。
+**Slide 5**（80 秒）：现场生成并运行 weak-2048；指出模数实际位数、生成耗时、恢复 $d$ 的一致性与解密结果；再显示 normal control。
 
 **Slide 6**（60 秒）：显示真实 success-rate 图和 timing 图。先讲“观察结果”，再讲“为何符合/不完全符合理论边界”，不要把关联讲成绝对因果或把小样本结论泛化。
 
@@ -441,7 +442,7 @@ RSA WIENER ATTACK: LIVE DEMONSTRATION
 ### 7.1 交付物
 
 1. 可运行的 Python 源代码（需要时可提交）。
-2. 一条命令的 Demo + 至少一套已验证的 2048-bit **弱 RSA** fixture。
+2. 一条命令现场生成并攻击 2048-bit 弱 RSA，同时运行普通 RSA 对照。
 3. 自动化测试和测试结果。
 4. 实验原始 CSV、真实生成的图表和文字解释。
 5. 6 分钟 Presentation（以老师最终时间通知为准）+ 2 分钟 Q&A 准备。
@@ -459,7 +460,7 @@ RSA WIENER ATTACK: LIVE DEMONSTRATION
 - [ ] 2048-bit **弱参数**案例可以正确恢复 $d$、$p,q$ 并解密。
 - [ ] 一组正常 RSA 公钥对照实验如实报告。
 - [ ] 实验 E1/E2/E3 可复现，并有真实 CSV、至少两张图和一张对照表。
-- [ ] Demo 可以离线运行、可在 80 秒内讲清，备用 fixture 可用。
+- [ ] Demo 可以离线现场生成密钥，并已在演示机器上完整练习至少三次。
 - [ ] PPT 有数学原理、代码实现、实验结果、局限性、AI/作者声明。
 - [ ] 能回答“为何得到候选 $d$、如何验证 $d$、攻击假设是什么”。
 

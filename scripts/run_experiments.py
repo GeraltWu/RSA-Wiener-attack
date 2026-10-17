@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import argparse
 import platform
 import sys
 from collections import defaultdict
+from decimal import Decimal
 from pathlib import Path
 from statistics import median
 from time import perf_counter
@@ -30,6 +30,41 @@ from src.wiener_attack import wiener_attack
 RAW_DIR = PROJECT_ROOT / "results" / "raw"
 PLOT_DIR = PROJECT_ROOT / "results" / "plots"
 
+# ======================== 可调整实验参数 ========================
+# 选择要运行的实验。把不需要运行的实验改为 False。
+RUN_E1 = True
+RUN_E2 = False
+RUN_E3 = False
+
+# 每一个参数组重复运行的次数。正式结果使用 30，快速检查时可以临时改为 2。
+TRIALS_PER_GROUP = 30
+
+# E1：固定模数位数，观察不同 d/T 对攻击成功率的影响。
+E1_BITS = 512
+E1_RATIOS = [
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    4.0,
+    5.0,
+    8.0,
+]
+
+# E2：固定 d/T，观察模数位数对攻击时间的影响。
+E2_BITS = [256, 512, 1024, 2048]
+E2_RATIO = 0.75
+
+# E3：在相同模数位数下比较弱 RSA 和普通 RSA。
+E3_BITS = 2048
+E3_RATIO = 0.75
+# ================================================================
+
 
 def prepare_output_directories() -> None:
     """创建实验结果目录。"""
@@ -45,7 +80,7 @@ def run_attack_trial(
     requested_bits: int,
     key: RSAKeyPair,
     keygen_ms: float,
-    d_to_threshold: float,
+    d_to_threshold: Decimal,
 ) -> TrialRecord:
     """对一组已经生成的密钥运行攻击并构造统一实验记录。"""
 
@@ -106,7 +141,9 @@ def generate_weak_trial(
         requested_bits=bits,
         key=generated.key_pair,
         keygen_ms=generated.generation_elapsed_s * 1000,
-        d_to_threshold=generated.d_to_threshold,
+        d_to_threshold=(
+            Decimal(generated.d) / Decimal(generated.approximate_threshold)
+        ),
     )
 
 
@@ -124,7 +161,9 @@ def generate_normal_trial(trial_id: int, bits: int, label: str) -> TrialRecord:
         requested_bits=bits,
         key=key,
         keygen_ms=keygen_ms,
-        d_to_threshold=key.d / threshold,
+        # 2048-bit 普通 RSA 的 d/T 会超过 float 能表示的最大值，
+        # 因此使用 Decimal 保存这个实验统计值。
+        d_to_threshold=Decimal(key.d) / Decimal(threshold),
     )
 
 
@@ -256,62 +295,28 @@ def run_e3(bits: int, ratio: float, trials: int) -> list[TrialRecord]:
         group = [item for item in records if item.key_type == key_type]
         successes = sum(item.recovered and item.verify_ok for item in group)
         median_ms = median(item.attack_ms for item in group)
-        print(f"  {key_type:6s}: recovered={successes}/{trials}, median={median_ms:.3f} ms")
+        median_ratio = median(item.d_to_threshold for item in group)
+        print(
+            f"  {key_type:6s}: recovered={successes}/{trials}, "
+            f"median d/T={median_ratio:.3e}, median={median_ms:.3f} ms"
+        )
 
     write_trial_records(RAW_DIR / "weak_vs_normal.csv", records)
     return records
 
 
-def parse_number_list(text: str, converter) -> list:
-    """解析用逗号分隔的命令行数值列表。"""
-
-    try:
-        values = [converter(part.strip()) for part in text.split(",") if part.strip()]
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(f"无法解析数值列表：{text}") from exc
-    if not values:
-        raise argparse.ArgumentTypeError("数值列表不能为空")
-    return values
-
-
-def parse_args() -> argparse.Namespace:
-    """解析实验选择、重复次数和参数范围。"""
-
-    parser = argparse.ArgumentParser(description="运行 RSA Wiener 攻击实验")
-    parser.add_argument("--experiment", choices=("all", "e1", "e2", "e3"), default="all")
-    parser.add_argument("--trials", type=int, default=10, help="每个参数组的重复次数")
-    parser.add_argument("--quick", action="store_true", help="每组只跑 2 次，E2 只用 256/512 bit")
-    parser.add_argument("--e1-bits", type=int, default=512)
-    parser.add_argument("--e1-ratios", default="0.25,0.5,0.75,1.25,2.0")
-    parser.add_argument("--e2-bits", default="256,512,1024,2048")
-    parser.add_argument("--e2-ratio", type=float, default=0.25)
-    parser.add_argument("--e3-bits", type=int, default=512)
-    parser.add_argument("--e3-ratio", type=float, default=0.25)
-    args = parser.parse_args()
-    if args.trials <= 0:
-        parser.error("--trials 必须为正数")
-    return args
-
-
 def main() -> int:
     """运行所选实验并把 CSV、PNG 写入 results 目录。"""
 
-    args = parse_args()
     prepare_output_directories()
 
-    trials = min(args.trials, 2) if args.quick else args.trials
-    e1_ratios = parse_number_list(args.e1_ratios, float)
-    e2_bits = parse_number_list(args.e2_bits, int)
-    if args.quick:
-        e2_bits = [bits for bits in e2_bits if bits <= 512]
-
     started = perf_counter()
-    if args.experiment in ("all", "e1"):
-        run_e1(args.e1_bits, e1_ratios, trials)
-    if args.experiment in ("all", "e2"):
-        run_e2(e2_bits, args.e2_ratio, trials)
-    if args.experiment in ("all", "e3"):
-        run_e3(args.e3_bits, args.e3_ratio, trials)
+    if RUN_E1:
+        run_e1(E1_BITS, E1_RATIOS, TRIALS_PER_GROUP)
+    if RUN_E2:
+        run_e2(E2_BITS, E2_RATIO, TRIALS_PER_GROUP)
+    if RUN_E3:
+        run_e3(E3_BITS, E3_RATIO, TRIALS_PER_GROUP)
 
     print(f"\n全部所选实验完成，总耗时 {perf_counter() - started:.2f} s")
     print(f"CSV: {RAW_DIR}")

@@ -15,10 +15,11 @@ e 和 n，并通过精确整数运算恢复和验证 d、p、q。
 - `src/experiment_utils.py`：实验记录、CSV 和统计。
 - `scripts/demo.py`：现场演示。
 - `scripts/run_experiments.py`：运行 E1、E2、E3 并生成 CSV、PNG。
-- `scripts/generate_fixtures.py`：重新生成离线演示 fixture。
 - `tests/`：自动化测试。
 - `docs/CODE_EXPLANATION.md`：代码讲解。
 - `docs/DEMO_GUIDE.md`：演示步骤和讲稿。
+- `docs/PRESENTATION_SCRIPT_CN.md`：8 分钟 Presentation 中文内容与讲解稿。
+- `docs/PRESENTATION_SCRIPT_EN.md`：8 分钟 Presentation 英文内容与讲解稿。
 - `docs/CODE_AUTHORSHIP_AND_AI_USE.md`：作者与 AI 使用声明模板。
 - `docs/EXPERIMENT_RESULTS.md`：当前完整实验结果和限制。
 
@@ -33,35 +34,35 @@ python -m pip install -r requirements.txt
 python -B -m unittest discover -s tests -v
 python -m pytest -q
 python -B scripts/demo.py
-python -B scripts/run_experiments.py --quick
-python -B scripts/run_experiments.py --trials 10
+python -B scripts/run_experiments.py
 ```
 
 如果不激活环境，也可使用：
 
 ```powershell
-conda run --no-capture-output -n common python -B scripts/run_experiments.py --quick
+conda run --no-capture-output -n common python -B scripts/run_experiments.py
 ```
 
 ## 演示模式
 
-默认读取已经验证过的 2048-bit fixture：
+默认现场随机生成一组弱 RSA 和一组普通 RSA：
 
 ```powershell
 python -B scripts/demo.py
 ```
 
-现场随机生成两组 2048-bit 密钥：
+Demo 默认显示 RSA 参数位数与缩写值、连分数摘要、成功候选的恢复过程以及各阶段
+用时。如需展开完整内容：
 
 ```powershell
-python -B scripts/demo.py --generate
+# 显示 n、e、d、p、q、phi 等完整大整数
+python -B scripts/demo.py --full-values
+
+# 显示 e/n 的完整连分数系数列表
+python -B scripts/demo.py --full-coefficients
 ```
 
-指定另一份弱密钥 fixture：
-
-```powershell
-python -B scripts/demo.py --fixture fixtures/weak_rsa_2048.json
-```
+完整模式会产生很长的终端输出，正式演示建议使用默认摘要模式。
 
 ## 实验输出
 
@@ -73,13 +74,15 @@ python -B scripts/demo.py --fixture fixtures/weak_rsa_2048.json
 - `results/plots/wiener_success_vs_d_ratio.png`
 - `results/plots/wiener_time_vs_modulus_bits.png`
 
-`--quick` 只用于检查程序和绘图流程。提交或汇报时应重新运行至少 10 次的完整
-实验，并以最终生成时间对应的 CSV 和图片作为真实数据。
+实验参数集中在 `scripts/run_experiments.py` 顶部的“可调整实验参数”区域。可以直接
+修改要运行的实验、每组次数、模数位数和 d/T。当前正式配置每组运行 30 次；如果
+只想快速检查流程，可临时把 `TRIALS_PER_GROUP` 改为 2，并按需关闭 E1、E2 或 E3。
+E3 与 Demo 均默认使用 2048-bit 模数；E2、E3 和 Demo 的弱密钥使用 d/T≈0.75。
+提交或汇报时应恢复正式参数并重新运行，以最终生成的 CSV 和图片为准。
 
 ## 安全边界
 
 - RSA 整数加解密函数没有实现 OAEP 等安全填充，只用于本项目的数学验证。
-- fixture 文件包含私钥，仅供本地课程演示。
 - 超出 Wiener 经典边界不代表密钥一定安全，只表示经典定理不再保证成功。
 - Wiener 攻击返回 None 不构成完整的 RSA 安全证明。
 
