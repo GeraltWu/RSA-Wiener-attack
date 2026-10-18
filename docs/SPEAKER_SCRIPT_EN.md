@@ -56,23 +56,23 @@ receives only the public e and n.
 
 ---
 
-## Slide 4: Our Wiener Attack Implementation (about 1 minute 10 seconds)
+## Slide 4: Wiener Attack Candidate Recovery (about 1 minute 10 seconds)
 
 The attack receives only the public values e and n. It first calculates the continued
 fraction of e over n and treats each convergent as a candidate k and d.
 
-For a candidate that satisfies the divisibility condition shown on the slide, we can
-calculate a candidate phi.
+If k divides e times d minus one, the program can derive an integer candidate for phi.
 
-We then use phi to obtain p plus q. Since the product of p and q is already known to
-be n, we can construct the quadratic equation shown here, whose two roots are p and q.
+It then uses phi to calculate p plus q. Since the product of p and q is n, they must be
+the two roots of the quadratic equation shown on the slide.
 
-If the discriminant is a perfect square, the equation gives integer values for p and
-q.
+For a correct candidate, the discriminant equals the square of p minus q, so it must
+be non-negative and a perfect square. The program then uses the quadratic formula to
+recover candidate values for p and q.
 
-The program then verifies the RSA parameter relationships exactly. It returns d, p,
-and q only when every check passes. If any check fails, it continues with the next
-candidate.
+Finally, the program verifies that p times q equals n, phi equals the product of p
+minus one and q minus one, and e times d modulo phi equals one. It returns d, p, and q
+only when every check passes. Otherwise, it continues with the next convergent.
 
 We will now generate two 2048-bit RSA keys live and test both keys through exactly the
 same attack interface.
@@ -124,7 +124,7 @@ random keys to measure success rates and attack time.
 
 ## Slide 6: Experimental Results (about 1 minute 30 seconds)
 
-The left experiment fixes the modulus size at 512 bits and changes d over T, with 30
+The left experiment fixes the modulus size at 2048 bits and changes d over T, with 30
 trials in each group. Every key was recovered in the groups from 0.25 through 1.5.
 Starting at 2.0, the overall success rate decreased, although some samples beyond the
 boundary were still recovered. The boundary should therefore not be interpreted as a

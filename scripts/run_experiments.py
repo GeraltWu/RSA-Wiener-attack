@@ -40,7 +40,7 @@ RUN_E3 = False
 TRIALS_PER_GROUP = 30
 
 # E1：固定模数位数，观察不同 d/T 对攻击成功率的影响。
-E1_BITS = 512
+E1_BITS = 2048
 E1_RATIOS = [
     0.25,
     0.5,
