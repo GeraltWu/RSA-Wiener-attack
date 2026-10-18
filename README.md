@@ -20,6 +20,8 @@ e 和 n，并通过精确整数运算恢复和验证 d、p、q。
 - `docs/DEMO_GUIDE.md`：演示步骤和讲稿。
 - `docs/PRESENTATION_SCRIPT_CN.md`：8 分钟 Presentation 中文内容与讲解稿。
 - `docs/PRESENTATION_SCRIPT_EN.md`：8 分钟 Presentation 英文内容与讲解稿。
+- `docs/SPEAKER_SCRIPT_CN.md`：可直接排练的中文纯讲稿。
+- `docs/SPEAKER_SCRIPT_EN.md`：可直接排练的英文纯讲稿。
 - `docs/CODE_AUTHORSHIP_AND_AI_USE.md`：作者与 AI 使用声明模板。
 - `docs/EXPERIMENT_RESULTS.md`：当前完整实验结果和限制。
 

@@ -106,13 +106,13 @@ def run_demo(
     print("=" * 76)
     print("RSA WIENER ATTACK: LIVE DEMONSTRATION")
     print("=" * 76)
-    print(f"数据来源：{source}")
-    print(f"密钥读取/准备时间：{preparation_ms:.3f} ms")
-    print("大整数默认显示首尾数字和位数，程序内部始终使用完整整数。")
+    print(f"Data source: {source}")
+    print(f"Key generation time: {preparation_ms:.3f} ms")
+    print("Large integers are abbreviated; all calculations use full values.")
     print()
 
-    print("1) 弱 RSA 参数：生成端参考值")
-    print_key_parameters("   故意使用小 d 的 RSA：", weak_key, full_values)
+    print("1) Weak RSA parameters (reference values)")
+    print_key_parameters("   RSA with intentionally small d:", weak_key, full_values)
     weak_threshold = approximate_wiener_threshold(weak_key.n)
     print(f"   Wiener threshold T = {display_integer(weak_threshold, full_values)}")
     print(f"   d/T                 = {weak_key.d / weak_threshold:.6f}")
@@ -120,11 +120,11 @@ def run_demo(
         "   d < n^(1/4)/3       = "
         f"{is_below_wiener_bound(weak_key.d, weak_key.n)}"
     )
-    print("   注意：d、p、q、phi 只作为演示参考，不传给攻击函数。")
-    print("   攻击函数的实际输入只有公开的 e 和 n。")
+    print("   Reference values d, p, q, and phi are not passed to the attack.")
+    print("   The attack receives only the public e and n.")
     print()
 
-    print("2) 加密测试消息并计算 e/n 的连分数")
+    print("2) Encrypt a test message and compute the continued fraction of e/n")
     message_text = "Wiener attack demo"
     message = int.from_bytes(message_text.encode("utf-8"), "big")
     encrypt_started = perf_counter()
@@ -142,13 +142,13 @@ def run_demo(
     )
     print()
 
-    print("3) 只使用公开的 e、n 运行 Wiener 攻击")
+    print("3) Run the Wiener attack using only the public e and n")
     attack_started = perf_counter()
     # 【关键演示点】攻击调用只传入公开的 e 和 n。
     result = wiener_attack(weak_key.e, weak_key.n)
     weak_attack_ms = (perf_counter() - attack_started) * 1000
     if result is None:
-        print("   攻击未找到有效 Wiener 候选")
+        print("   No valid Wiener candidate was found.")
         return False
 
     # 找到攻击成功时所对应的渐近分数 k/d，展示候选验证链条。
@@ -190,7 +190,7 @@ def run_demo(
     print(f"   attack time                 = {weak_attack_ms:.3f} ms")
     print()
 
-    print("4) 使用恢复出的 d 解密")
+    print("4) Decrypt using the recovered d")
     decrypt_started = perf_counter()
     recovered_message = rsa_decrypt(ciphertext, result.d, weak_key.n)
     weak_decrypt_ms = (perf_counter() - decrypt_started) * 1000
@@ -205,10 +205,10 @@ def run_demo(
     print(f"   decryption time       = {weak_decrypt_ms:.3f} ms")
     print()
 
-    print("5) 普通 RSA 对照")
-    print("   5.1 普通 RSA 参数构造")
+    print("5) Normal RSA control")
+    print("   5.1 Normal RSA parameter generation")
     print_key_parameters(
-        "   生成的普通 RSA 参数：",
+        "   Generated normal RSA parameters:",
         normal_key,
         full_values,
         show_validation=False,
@@ -222,20 +222,20 @@ def run_demo(
     )
 
     print()
-    print("   5.2 使用相同的 wiener_attack(e, n) 尝试攻击")
+    print("   5.2 Run the same wiener_attack(e, n)")
     calculate_continued_fraction(
         "normal RSA",
         normal_key.e,
         normal_key.n,
         full_coefficients,
     )
-    print("   （普通 RSA 使用 17-bit 的 e=65537，因此 e/n 的连分数通常很短。）")
+    print("   (With the 17-bit e=65537, e/n usually has a short continued fraction.)")
     normal_attack_started = perf_counter()
     normal_result = wiener_attack(normal_key.e, normal_key.n)
     normal_attack_ms = (perf_counter() - normal_attack_started) * 1000
     print(f"   wiener_attack returned None = {normal_result is None}")
     print(f"   attack time               = {normal_attack_ms:.3f} ms")
-    print("   None 只表示 Wiener 攻击未恢复该密钥，不是完整安全证明。")
+    print("   None means this attack did not recover the key; it is not a complete security proof.")
     print()
 
     print("=" * 76)
@@ -251,16 +251,16 @@ def run_demo(
 def parse_args() -> argparse.Namespace:
     """解析控制大整数和连分数显示长度的参数。"""
 
-    parser = argparse.ArgumentParser(description="演示 RSA Wiener 攻击")
+    parser = argparse.ArgumentParser(description="Demonstrate the RSA Wiener attack")
     parser.add_argument(
         "--full-values",
         action="store_true",
-        help="打印 n、e、d、p、q、phi 等大整数的完整十进制值",
+        help="print the complete decimal values of n, e, d, p, q, and phi",
     )
     parser.add_argument(
         "--full-coefficients",
         action="store_true",
-        help="打印 e/n 的完整连分数系数列表",
+        help="print the complete continued-fraction coefficient list for e/n",
     )
     return parser.parse_args()
 
@@ -272,7 +272,7 @@ def main() -> int:
     preparation_started = perf_counter()
     weak_key = generate_weak_rsa(2048, 0.75).key_pair
     normal_key = generate_normal_rsa(2048)
-    source = "本次运行现场随机生成的两组 2048-bit RSA 密钥"
+    source = "two 2048-bit RSA keys generated randomly during this run"
 
     preparation_ms = (perf_counter() - preparation_started) * 1000
     success = run_demo(
