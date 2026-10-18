@@ -79,70 +79,58 @@ same attack interface.
 
 ---
 
-## Slide 5: Live Demo (about 2 minutes 30 seconds)
+## Slide 5: Live Demo (about 3 minutes)
 
-### 1. Data source
+Now, we will demonstrate the complete attack process. All RSA parameters and attack
+results shown on the screen were generated and calculated during this run.
 
-Both keys were randomly generated during this run, and both moduli are actually 2048
-bits long. The first key intentionally uses a small d, while the second uses the normal
-construction with e equal to 65537.
+First, we construct a weak RSA key with a two-thousand-and-forty-eight-bit modulus. As
+we can see, we intentionally choose a small d. This d is about seventy-five
+percent of the Wiener bound, so this key satisfies the
+condition for Wiener’s attack. 
 
-### 2. Weak-key condition
+Next, we use this RSA key to encrypt a test message. 
 
-The weak key uses a d approximately 75 percent of the Wiener threshold, so it is
-inside the classical boundary used in our project. The generator keeps d, p, q, and
-phi only for final verification; these values are not passed to the attack.
+Now, we move to the attacker’s view. The attacker knows only the public e and n.
+We first use these two values to calculate the continued fraction of e over n and obtain
+this coefficient list. 
 
-### 3. Continued fraction and successful candidate
+We then try the convergents one by one and look for a candidate d that can recover the
+other RSA parameters. When the program reaches the convergent shown here, its
+denominator, which is our candidate d, passes all the validation checks.
 
-The program calculates the continued fraction of e over n and examines its
-convergents. These lines show the number of the successful candidate, its k, and its
-candidate d. We do not need to read every continued-fraction coefficient.
+First, after checking this we can make sure our candidate phi is integer. Once phi is known, we can calculate p plus q. Together with p times q equals n, then we can construct the quadratic equation we have mentioned. Then we get the two roots of the equation, which is p and q.
+it recoverd all the rsa parameters
 
-### 4. Recovery process
+Finally, we use the recovered d to decrypt the earlier ciphertext and successfully get
+the original test message. Now the weak RSA key has been broken.
 
-This output follows the algorithm shown on the previous slide. The program first
-obtains phi from the candidate k and d, calculates p plus q, constructs the quadratic
-equation, checks the discriminant, and finally recovers p and q.
+We also construct a normal RSA key as a control. It uses the same large modulus size and follows the normal process, we use this value as e, which is lot of instructions and our lecture slides recomanded.
+Here, d is very large and far beyond the Wiener bound.
 
-### 5. Successful verification
+We run exactly the same Wiener attack again. This continued fraction contains only the
+number of coefficients shown here, which is expected because e is only seventeen bits.
+The attack function finally returns None, meaning that it found no candidate d that
+passed all the checks in this run.
 
-The recovered phi, p, q, and d all match the private reference values retained by the
-live generator. The recovered d also decrypts the test message correctly.
-
-### 6. Normal RSA control
-
-The normal key also has a 2048-bit modulus, but its d is far beyond the Wiener
-boundary. The identical attack returns None in this run. This is not a complete proof
-of RSA security, but it demonstrates that the earlier recovery depended on the small-d
-weakness rather than applying to every RSA key.
-
-A single live run demonstrates only one pair of keys. We therefore generated multiple
-random keys to measure success rates and attack time.
+Next, we look at the results from repeated experiments with different parameters.
 
 ---
 
-## Slide 6: Experimental Results (about 1 minute 30 seconds)
+## Slide 6: Experimental Results (about 1 minute)
 
-The left experiment fixes the modulus size at 2048 bits and changes d over T, with 30
-trials in each group. Every key was recovered in the groups from 0.25 through 1.5.
-Starting at 2.0, the overall success rate decreased, although some samples beyond the
-boundary were still recovered. The boundary should therefore not be interpreted as a
-point beyond which every attack immediately fails.
+Here, we have three repeated experiments, with thirty trials in each parameter group.
 
-The upper-right experiment fixes d over T at 0.75 and changes the modulus size. All 30
-keys were recovered in each of the 256-, 512-, 1024-, and 2048-bit groups. The median
-attack time increased from 0.179 milliseconds to 6.425 milliseconds. The runtime
-increased with the modulus size, but the 2048-bit weak keys were still recovered in
-milliseconds.
+The left chart fixes the modulus size at two thousand and forty-eight bits and changes
+the ratio between d and the Wiener threshold. Every trial succeeded from 0.25 to 1.5.
+From 2.0 onward, the overall success rate decreased
 
-The lower-right table shows the 2048-bit control experiment. All 30 weak keys were
-recovered, while none of the 30 normal keys were recovered. In this experiment, using
-a larger modulus did not prevent the attack when d remained too small.
+The upper-right chart fixes d over T at 0.75 and changes the modulus size. All four
+groups of weak keys were recovered. The runtime increased with the modulus size, but
+even the two-thousand-and-forty-eight-bit weak keys were still recovered in milliseconds.
 
-These are course-scale randomized experiments. Returning None only means that Wiener’s
-attack did not succeed on these samples; it is not a complete security proof against
-all possible attacks on RSA.
+The lower-right result directly compares weak and normal RSA at 2048 bits. All thirty
+weak keys were recovered, while none of the thirty normal keys were recovered. 
 
 Finally, we list the core functions that we declare as our own implementation.
 

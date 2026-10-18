@@ -108,7 +108,7 @@ def run_demo(
     print("=" * 76)
     print(f"Data source: {source}")
     print(f"Key generation time: {preparation_ms:.3f} ms")
-    print("Large integers are abbreviated; all calculations use full values.")
+    # print("Large integers are abbreviated; all calculations use full values.")
     print()
 
     print("1) Weak RSA parameters (reference values)")
@@ -124,7 +124,7 @@ def run_demo(
     print("   The attack receives only the public e and n.")
     print()
 
-    print("2) Encrypt a test message and compute the continued fraction of e/n")
+    print("2) Encrypt a test message with the weak RSA key")
     message_text = "Wiener attack demo"
     message = int.from_bytes(message_text.encode("utf-8"), "big")
     encrypt_started = perf_counter()
@@ -134,6 +134,9 @@ def run_demo(
     print(f"   plaintext integer = {message}")
     print(f"   ciphertext        = {display_integer(ciphertext, full_values)}")
     print(f"   encryption time   = {weak_encrypt_ms:.3f} ms")
+    print()
+
+    print("3) Attacker view: compute the continued fraction of e/n")
     weak_coefficients = calculate_continued_fraction(
         "weak RSA",
         weak_key.e,
@@ -142,7 +145,7 @@ def run_demo(
     )
     print()
 
-    print("3) Run the Wiener attack using only the public e and n")
+    print("4) Test convergents and recover the private parameters")
     attack_started = perf_counter()
     # 【关键演示点】攻击调用只传入公开的 e 和 n。
     result = wiener_attack(weak_key.e, weak_key.n)
@@ -190,7 +193,7 @@ def run_demo(
     print(f"   attack time                 = {weak_attack_ms:.3f} ms")
     print()
 
-    print("4) Decrypt using the recovered d")
+    print("5) Decrypt using the recovered d")
     decrypt_started = perf_counter()
     recovered_message = rsa_decrypt(ciphertext, result.d, weak_key.n)
     weak_decrypt_ms = (perf_counter() - decrypt_started) * 1000
@@ -205,8 +208,8 @@ def run_demo(
     print(f"   decryption time       = {weak_decrypt_ms:.3f} ms")
     print()
 
-    print("5) Normal RSA control")
-    print("   5.1 Normal RSA parameter generation")
+    print("6) Normal RSA control")
+    print("   6.1 Normal RSA parameter generation")
     print_key_parameters(
         "   Generated normal RSA parameters:",
         normal_key,
@@ -222,7 +225,7 @@ def run_demo(
     )
 
     print()
-    print("   5.2 Run the same wiener_attack(e, n)")
+    print("   6.2 Run the same wiener_attack(e, n)")
     calculate_continued_fraction(
         "normal RSA",
         normal_key.e,
@@ -235,7 +238,7 @@ def run_demo(
     normal_attack_ms = (perf_counter() - normal_attack_started) * 1000
     print(f"   wiener_attack returned None = {normal_result is None}")
     print(f"   attack time               = {normal_attack_ms:.3f} ms")
-    print("   None means this attack did not recover the key; it is not a complete security proof.")
+    #print("   None means this attack did not recover the key; it is not a complete security proof.")
     print()
 
     print("=" * 76)

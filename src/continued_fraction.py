@@ -8,9 +8,6 @@ from collections.abc import Iterable, Iterator
 # 【自己实现】使用连续整除计算连分数系数。
 def continued_fraction(numerator: int, denominator: int) -> list[int]:
 
-    if denominator <= 0:
-        raise ValueError("分母必须为正数")
-
     coefficients: list[int] = []
     a, b = numerator, denominator
 
